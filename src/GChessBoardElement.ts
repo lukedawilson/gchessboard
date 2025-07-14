@@ -6,6 +6,8 @@ import {
   Side,
   Square,
   Piece,
+  PieceType,
+  addCustomPieceTypes,
 } from "./utils/chess.js";
 import { Board } from "./components/Board.js";
 import importedStyles from "./style.css?inline";
@@ -204,6 +206,37 @@ export class GChessBoardElement extends HTMLElement {
 
     this._arrows = new Arrows(GChessBoardElement._DEFAULT_SIDE);
     this._boardArrowsWrapper.appendChild(this._arrows.element);
+  }
+
+  /**
+   * Add custom pieces to the board. These do not replace the default pieces, register custom piece types along with FEN notation codes.
+   * @param map Piece definitions in the following format:
+   *
+   * ```js
+   * {
+   *   a: 'amazon',
+   *   c: 'commoner',
+   *   e: 'elephant',
+   * }
+   * ```
+   *
+   * The key corresponds to the piece type in the FEN notation, such as `a` for `Amazon`.
+   *
+   * The following example FEN is taken from the variant [Maharajah and the Sepoys](https://en.wikipedia.org/wiki/Maharajah_and_the_Sepoys),
+   * and features a white custom Amazon piece, represented here by an `M` in the FEN string:
+   *
+   * ```
+   * rnbqkbnr/pppppppp/8/8/8/8/8/4M3
+   * ```
+   *
+   * The following example features a number of black custom pieces, including Centaur (h), Knibis (a), Kniroo (l) and Silver (y):
+   *
+   * ```
+   * lhaykahl/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR
+   * ```
+   */
+  addCustomPieces(map: Record<PieceType, string>) {
+    addCustomPieceTypes(map);
   }
 
   connectedCallback() {

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Move back to using Vite, as the reason to move to Rollup was to use things like
   `rollup-plugin-dts`. Now we have `vite-plugin-dts` which achieves the same thing.
+- Add support for custom pieces via `GChessBoardElement.addCustomPieces`.
+  Contributor: @lukedawilson
 
 ## [1.3.1] - 2024-07-14
 

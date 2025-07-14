@@ -15,7 +15,7 @@ export const PIECE_TYPES = [
   "bishop",
   "rook",
   "pawn",
-] as const;
+];
 
 export type SquareColor = (typeof SQUARE_COLORS)[number];
 export type Side = (typeof SIDE_COLORS)[number];
@@ -76,15 +76,30 @@ const FEN_PIECE_TYPE_MAP: { [key: string]: PieceType } = {
   q: "queen",
   k: "king",
 };
-const REVERSE_FEN_PIECE_TYPE_MAP: Record<PieceType, string> = Object.keys(
-  FEN_PIECE_TYPE_MAP
-).reduce(
-  (acc, key) => {
-    acc[FEN_PIECE_TYPE_MAP[key]] = key;
-    return acc;
-  },
-  {} as Record<PieceType, string>
-);
+export const REVERSE_FEN_PIECE_TYPE_MAP: Record<PieceType, string> =
+  Object.keys(FEN_PIECE_TYPE_MAP).reduce(
+    (acc, key) => {
+      acc[FEN_PIECE_TYPE_MAP[key]] = key;
+      return acc;
+    },
+    {} as Record<PieceType, string>
+  );
+
+export function addCustomPieceTypes(map: Record<string, string>): void {
+  Object.values(map).forEach((value) => PIECE_TYPES.push(value));
+
+  Object.assign(FEN_PIECE_TYPE_MAP, map);
+  Object.assign(
+    REVERSE_FEN_PIECE_TYPE_MAP,
+    Object.keys(FEN_PIECE_TYPE_MAP).reduce(
+      (acc, key) => {
+        acc[FEN_PIECE_TYPE_MAP[key]] = key;
+        return acc;
+      },
+      {} as Record<PieceType, string>
+    )
+  );
+}
 
 export type PositionDiff = {
   added: Array<{ piece: Piece; square: Square }>;

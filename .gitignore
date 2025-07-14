@@ -9,6 +9,7 @@ dist
 
 # other
 .DS_Store
+/.idea
 
 # testing
 test-results/
