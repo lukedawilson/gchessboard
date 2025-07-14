@@ -1,4 +1,9 @@
-import { Piece, PieceType, Side } from "../utils/chess.js";
+import {
+  Piece,
+  PieceType,
+  Side,
+  REVERSE_FEN_PIECE_TYPE_MAP,
+} from "../utils/chess.js";
 import { makeHTMLElement } from "../utils/dom.js";
 import { assertUnreachable } from "../utils/typing.js";
 
@@ -77,7 +82,7 @@ export class BoardPiece {
   /**
    * Map of piece to background image CSS class name.
    */
-  private static PIECE_CLASS_MAP: Record<Side, Record<PieceType, string>> = {
+  public static PIECE_CLASS_MAP: Record<Side, Record<PieceType, string>> = {
     white: {
       queen: "wq",
       king: "wk",
@@ -97,10 +102,21 @@ export class BoardPiece {
   };
 
   /**
-   * CSS custom property for scale applied to piece while draggging.
+   * CSS custom property for scale applied to piece while dragging.
    * This is overridden per input method within CSS styles.
    */
   private static PIECE_DRAG_SCALE_PROP = "--p-piece-drag-scale";
+
+  private resolvePieceClass(color: Side, pieceType: PieceType) {
+    const pieceClass = BoardPiece.PIECE_CLASS_MAP[color][pieceType];
+    if (pieceClass) {
+      return pieceClass;
+    }
+
+    const c = color === "white" ? "w" : "b";
+    const p = REVERSE_FEN_PIECE_TYPE_MAP[pieceType];
+    return `${c}${p}`;
+  }
 
   constructor(container: HTMLElement, config: BoardPieceConfig) {
     this.piece = config.piece;
@@ -109,13 +125,11 @@ export class BoardPiece {
       attributes: {
         role: "presentation",
         "aria-hidden": "true",
-        part: `piece-${
-          BoardPiece.PIECE_CLASS_MAP[this.piece.color][this.piece.pieceType]
-        }`,
+        part: `piece-${this.resolvePieceClass(this.piece.color, this.piece.pieceType)}`,
       },
       classes: [
         "piece",
-        BoardPiece.PIECE_CLASS_MAP[this.piece.color][this.piece.pieceType],
+        this.resolvePieceClass(this.piece.color, this.piece.pieceType),
       ],
     });
 
