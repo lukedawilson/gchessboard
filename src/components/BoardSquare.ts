@@ -20,7 +20,7 @@ type BoardSquareMoveState = "move-start" | "move-target" | "move-nontarget";
  * Visual representation of a chessboard square, along with attributes
  * that aid in interactivity (ARIA role, labels etc).
  */
-export class BoardSquare {
+export class BoardSquare<CustomPieceType extends string = never> {
   private readonly _tdElement: HTMLTableCellElement;
   private readonly _contentElement: HTMLDivElement;
   private readonly _slotWrapper: HTMLElement;
@@ -30,14 +30,21 @@ export class BoardSquare {
   private _interactive = false;
   private _tabbable = false;
   private _moveable = false;
-  private _boardPiece?: BoardPiece;
-  private _secondaryBoardPiece?: BoardPiece;
+  private _boardPiece?: BoardPiece<CustomPieceType>;
+  private _secondaryBoardPiece?: BoardPiece<CustomPieceType>;
   private _hasContent?: boolean;
   private _hover = false;
   private _markedTarget = false;
   private _moveState?: BoardSquareMoveState;
+  private _reverseCustomPieceTypeMap?: Record<string, string>;
 
-  constructor(container: HTMLElement, label: Square) {
+  constructor(
+    container: HTMLElement,
+    label: Square,
+    reverseCustomPieceTypeMap?: Record<string, string>
+  ) {
+    this._reverseCustomPieceTypeMap = reverseCustomPieceTypeMap;
+
     this._tdElement = makeHTMLElement("td", { attributes: { role: "cell" } });
     this._label = label;
 
@@ -230,16 +237,20 @@ export class BoardSquare {
    * the same.
    */
   setPiece(
-    piece: Piece,
+    piece: Piece<CustomPieceType>,
     moveable: boolean,
     animation?: SlideInAnimation | FadeInAnimation
   ) {
     if (!pieceEqual(this._boardPiece?.piece, piece) || animation) {
       this.clearPiece(animation?.durationMs);
-      this._boardPiece = new BoardPiece(this._contentElement, {
-        piece,
-        animation,
-      });
+      this._boardPiece = new BoardPiece<CustomPieceType>(
+        this._contentElement,
+        {
+          piece,
+          animation,
+        },
+        this._reverseCustomPieceTypeMap
+      );
       this.moveable = moveable;
       this._updateSquareAfterPieceChange();
     }
@@ -261,10 +272,14 @@ export class BoardSquare {
    */
   toggleSecondaryPiece(show: boolean) {
     if (show && !this._secondaryBoardPiece && this._boardPiece) {
-      this._secondaryBoardPiece = new BoardPiece(this._contentElement, {
-        piece: this._boardPiece.piece,
-        secondary: true,
-      });
+      this._secondaryBoardPiece = new BoardPiece<CustomPieceType>(
+        this._contentElement,
+        {
+          piece: this._boardPiece.piece,
+          secondary: true,
+        },
+        this._reverseCustomPieceTypeMap
+      );
     }
     if (!show) {
       if (this._secondaryBoardPiece !== undefined) {

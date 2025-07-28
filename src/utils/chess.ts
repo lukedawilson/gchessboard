@@ -20,10 +20,12 @@ export const PIECE_TYPES = [
 export type SquareColor = (typeof SQUARE_COLORS)[number];
 export type Side = (typeof SIDE_COLORS)[number];
 export type PieceType = (typeof PIECE_TYPES)[number];
-export type Position = Partial<Record<Square, Piece>>;
+export type Position<CustomPieceType extends string = never> = Partial<
+  Record<Square, Piece<CustomPieceType>>
+>;
 
-export interface Piece {
-  pieceType: PieceType;
+export interface Piece<CustomPieceType extends string = never> {
+  pieceType: PieceType | CustomPieceType;
   color: Side;
 }
 
@@ -85,53 +87,14 @@ export const REVERSE_FEN_PIECE_TYPE_MAP: Record<PieceType, string> =
     {} as Record<PieceType, string>
   );
 
-/**
- * Add custom pieces to the board. These do not replace the default pieces, register custom piece types along with FEN notation codes.
- * @param map Piece definitions in the following format:
- *
- * ```js
- * {
- *   a: 'amazon',
- *   c: 'commoner',
- *   e: 'elephant',
- * }
- * ```
- *
- * The key corresponds to the piece type in the FEN notation, such as `a` for `Amazon`.
- *
- * The following example FEN is taken from the variant [Maharajah and the Sepoys](https://en.wikipedia.org/wiki/Maharajah_and_the_Sepoys),
- * and features a white custom Amazon piece, represented here by an `M` in the FEN string:
- *
- * ```
- * rnbqkbnr/pppppppp/8/8/8/8/8/4M3
- * ```
- *
- * The following example features a number of black custom pieces, including Centaur (h), Knibis (a), Kniroo (l) and Silver (y):
- *
- * ```
- * lhaykahl/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR
- * ```
- */
-export function addCustomPieceTypes(map: Record<string, string>): void {
-  Object.values(map).forEach((value) => PIECE_TYPES.push(value));
-
-  Object.assign(FEN_PIECE_TYPE_MAP, map);
-  Object.assign(
-    REVERSE_FEN_PIECE_TYPE_MAP,
-    Object.keys(FEN_PIECE_TYPE_MAP).reduce(
-      (acc, key) => {
-        acc[FEN_PIECE_TYPE_MAP[key]] = key;
-        return acc;
-      },
-      {} as Record<PieceType, string>
-    )
-  );
-}
-
-export type PositionDiff = {
-  added: Array<{ piece: Piece; square: Square }>;
-  removed: Array<{ piece: Piece; square: Square }>;
-  moved: Array<{ piece: Piece; oldSquare: Square; newSquare: Square }>;
+export type PositionDiff<CustomPieceType extends string = never> = {
+  added: Array<{ piece: Piece<CustomPieceType>; square: Square }>;
+  removed: Array<{ piece: Piece<CustomPieceType>; square: Square }>;
+  moved: Array<{
+    piece: Piece<CustomPieceType>;
+    oldSquare: Square;
+    newSquare: Square;
+  }>;
 };
 
 /**
@@ -144,10 +107,16 @@ export type PositionDiff = {
  * parsed; any additional components are ignored.
  *
  * @param fen the FEN string
+ * @param customFenPieceTypeMap optional map to use custom piece types
  * @returns an object where key is of type Square (string) and value is
  *          of type Piece
  */
-export function getPosition(fen: string): Position | undefined {
+export function getPosition<CustomPieceType extends string = never>(
+  fen: string,
+  customFenPieceTypeMap?: { [key: string]: CustomPieceType }
+): Position | undefined {
+  customFenPieceTypeMap ||= {} as Record<string, CustomPieceType>;
+
   if (fen === "initial" || fen === "start") {
     fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
   }
@@ -164,10 +133,15 @@ export function getPosition(fen: string): Position | undefined {
     let fileOffset = 0;
     for (let j = 0; j < ranks[i].length; j++) {
       const pieceLetter = ranks[i][j].toLowerCase();
-      if (pieceLetter in FEN_PIECE_TYPE_MAP) {
+      if (
+        pieceLetter in FEN_PIECE_TYPE_MAP ||
+        pieceLetter in customFenPieceTypeMap
+      ) {
         const square = (String.fromCharCode(97 + fileOffset) + rank) as Square;
         position[square] = {
-          pieceType: FEN_PIECE_TYPE_MAP[pieceLetter],
+          pieceType:
+            FEN_PIECE_TYPE_MAP[pieceLetter] ??
+            customFenPieceTypeMap[pieceLetter],
           color: pieceLetter === ranks[i][j] ? "black" : "white",
         };
         fileOffset += 1;
@@ -191,7 +165,12 @@ export function getPosition(fen: string): Position | undefined {
  * Get FEN string corresponding to Position object. Note that this only returns
  * the first (piece placement) component of the FEN string.
  */
-export function getFen(position: Position): string {
+export function getFen<CustomPieceType extends string = never>(
+  position: Position,
+  reverseCustomFenPieceTypeMap?: Record<CustomPieceType, string>
+): string {
+  reverseCustomFenPieceTypeMap ||= {} as Record<CustomPieceType, string>;
+
   const rankSpecs = [];
   for (let i = 0; i < 8; i++) {
     let rankSpec = "";
@@ -200,7 +179,9 @@ export function getFen(position: Position): string {
       const square = REVERSE_SQUARES_MAP[16 * i + j];
       const piece = position[square];
       if (piece !== undefined) {
-        const pieceStr = REVERSE_FEN_PIECE_TYPE_MAP[piece.pieceType];
+        const pieceStr =
+          REVERSE_FEN_PIECE_TYPE_MAP[piece.pieceType] ??
+          reverseCustomFenPieceTypeMap[piece.pieceType as CustomPieceType];
         if (gap > 0) {
           rankSpec += gap;
         }
@@ -301,7 +282,10 @@ export function keyIsSquare(key: string | undefined): key is Square {
 /**
  * Deep equality check for two Piece objects.
  */
-export function pieceEqual(a: Piece | undefined, b: Piece | undefined) {
+export function pieceEqual<CustomPieceType extends string = never>(
+  a: Piece<CustomPieceType> | undefined,
+  b: Piece<CustomPieceType> | undefined
+) {
   return (
     (a === undefined && b === undefined) ||
     (a !== undefined &&
@@ -321,14 +305,21 @@ export function isSide(s: string | null): s is Side {
 /**
  * Deep equality check for Position objects.
  */
-export function positionsEqual(a: Position, b: Position) {
+export function positionsEqual<CustomPieceType extends string = never>(
+  a: Position<CustomPieceType>,
+  b: Position<CustomPieceType>
+) {
   return SQUARES.every((square) => pieceEqual(a[square], b[square]));
 }
 
-export function calcPositionDiff(
-  oldPosition: Position,
-  newPosition: Position
-): PositionDiff {
+export function calcPositionDiff<CustomPieceType extends string = never>(
+  oldPosition: Position<CustomPieceType>,
+  newPosition: Position<CustomPieceType>,
+  customPieceTypes?: string[]
+): PositionDiff<CustomPieceType> {
+  customPieceTypes ||= [] as string[];
+  const pieceTypes = [...PIECE_TYPES, ...customPieceTypes];
+
   // Limit old and new positions only to squares that are different
   const oldPositionLimited = { ...oldPosition };
   const newPositionLimited = { ...newPosition };
@@ -340,12 +331,15 @@ export function calcPositionDiff(
     }
   });
 
-  const added: Array<{ piece: Piece; square: Square }> = [];
-  const removed: Array<{ piece: Piece; square: Square }> = [];
-  const moved: Array<{ piece: Piece; oldSquare: Square; newSquare: Square }> =
-    [];
+  const added: Array<{ piece: Piece<CustomPieceType>; square: Square }> = [];
+  const removed: Array<{ piece: Piece<CustomPieceType>; square: Square }> = [];
+  const moved: Array<{
+    piece: Piece<CustomPieceType>;
+    oldSquare: Square;
+    newSquare: Square;
+  }> = [];
 
-  function groupByPiece(position: Position) {
+  function groupByPiece(position: Position<CustomPieceType>) {
     const groups = {} as Record<
       Side,
       Record<PieceType, { squares: Square[]; piece: Piece }>
@@ -355,7 +349,7 @@ export function calcPositionDiff(
         PieceType,
         { squares: Square[]; piece: Piece }
       >;
-      for (const pieceType of PIECE_TYPES) {
+      for (const pieceType of pieceTypes) {
         groups[color][pieceType] = { squares: [], piece: { color, pieceType } };
       }
     }
@@ -368,7 +362,7 @@ export function calcPositionDiff(
   const oldPositionGrouped = groupByPiece(oldPositionLimited);
   const newPositionGrouped = groupByPiece(newPositionLimited);
 
-  for (const pieceType of PIECE_TYPES) {
+  for (const pieceType of pieceTypes) {
     for (const color of SIDE_COLORS) {
       const piece = { pieceType, color };
       const oldSquares = [...oldPositionGrouped[color][pieceType].squares];

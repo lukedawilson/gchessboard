@@ -138,7 +138,9 @@ import { Arrows, BoardArrow } from "./components/Arrows.js";
  * @csspart arrow-<brush_name> - CSS parts for any arrow brushes configured using the
  *   `brush` field on an arrow specification (see the `arrows` property for more details).
  */
-export class GChessBoardElement extends HTMLElement {
+export class GChessBoardElement<
+  CustomPieceType extends string = never,
+> extends HTMLElement {
   static get observedAttributes() {
     return [
       "orientation",
@@ -187,7 +189,9 @@ export class GChessBoardElement extends HTMLElement {
         animationDurationMs: GChessBoardElement._DEFAULT_ANIMATION_DURATION_MS,
       },
       (e) => this.dispatchEvent(e),
-      this._shadow
+      this._shadow,
+      this._pieceTypes,
+      this._reverseCustomFenPieceTypeMap
     );
     this._boardArrowsWrapper.appendChild(this._board.element);
 
@@ -204,6 +208,54 @@ export class GChessBoardElement extends HTMLElement {
 
     this._arrows = new Arrows(GChessBoardElement._DEFAULT_SIDE);
     this._boardArrowsWrapper.appendChild(this._arrows.element);
+  }
+
+  private _pieceTypes: CustomPieceType[] = [];
+  private _customFenPieceTypeMap: { [key: string]: CustomPieceType } = {};
+  private _reverseCustomFenPieceTypeMap: Record<CustomPieceType, string> =
+    {} as Record<CustomPieceType, string>;
+
+  /**
+   * Add custom pieces to the board. These do not replace the default pieces, register custom piece types along with FEN notation codes.
+   * @param map Piece definitions in the following format:
+   *
+   * ```js
+   * {
+   *   a: 'amazon',
+   *   c: 'commoner',
+   *   e: 'elephant',
+   * }
+   * ```
+   *
+   * The key corresponds to the piece type in the FEN notation, such as `a` for `Amazon`.
+   *
+   * The following example FEN is taken from the variant [Maharajah and the Sepoys](https://en.wikipedia.org/wiki/Maharajah_and_the_Sepoys),
+   * and features a white custom Amazon piece, represented here by an `M` in the FEN string:
+   *
+   * ```
+   * rnbqkbnr/pppppppp/8/8/8/8/8/4M3
+   * ```
+   *
+   * The following example features a number of black custom pieces, including Centaur (h), Knibis (a), Kniroo (l) and Silver (y):
+   *
+   * ```
+   * lhaykahl/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR
+   * ```
+   */
+  addCustomPieces(map: Record<string, CustomPieceType>) {
+    Object.assign(this._pieceTypes, Object.values(map));
+
+    Object.assign(this._customFenPieceTypeMap, map);
+    Object.assign(
+      this._reverseCustomFenPieceTypeMap,
+      Object.keys(this._customFenPieceTypeMap).reduce(
+        (acc, key) => {
+          acc[this._customFenPieceTypeMap[key]] = key;
+          return acc;
+        },
+        {} as Record<string, string>
+      )
+    );
   }
 
   connectedCallback() {
@@ -352,11 +404,11 @@ export class GChessBoardElement extends HTMLElement {
    * @attr
    */
   get fen() {
-    return getFen(this._board.position);
+    return getFen(this._board.position, this._reverseCustomFenPieceTypeMap);
   }
 
   set fen(value: string) {
-    const position = getPosition(value);
+    const position = getPosition(value, this._customFenPieceTypeMap);
     if (position !== undefined) {
       this.position = position;
     } else {
@@ -556,27 +608,27 @@ export class GChessBoardElement extends HTMLElement {
   }
 }
 
-export interface MoveStartEvent {
+export interface MoveStartEvent<CustomPieceType extends string = never> {
   from: Square;
-  piece: Piece;
+  piece: Piece<CustomPieceType>;
   setTargets: (squares: Square[]) => void;
 }
 
-export interface MoveEndEvent {
+export interface MoveEndEvent<CustomPieceType extends string = never> {
   from: Square;
   to: Square;
-  piece: Piece;
+  piece: Piece<CustomPieceType>;
 }
 
-export interface MoveFinishedEvent {
+export interface MoveFinishedEvent<CustomPieceType extends string = never> {
   from: Square;
   to: Square;
-  piece: Piece;
+  piece: Piece<CustomPieceType>;
 }
 
-export interface MoveCancelEvent {
+export interface MoveCancelEvent<CustomPieceType extends string = never> {
   from: Square;
-  piece: Piece;
+  piece: Piece<CustomPieceType>;
 }
 
 declare global {
@@ -584,10 +636,10 @@ declare global {
     "g-chess-board": GChessBoardElement;
   }
 
-  interface ChessBoardEventMap {
-    movestart: CustomEvent<MoveStartEvent>;
-    moveend: CustomEvent<MoveEndEvent>;
-    movefinished: CustomEvent<MoveFinishedEvent>;
-    movecancel: CustomEvent<MoveCancelEvent>;
+  interface ChessBoardEventMap<CustomPieceType extends string = never> {
+    movestart: CustomEvent<MoveStartEvent<CustomPieceType>>;
+    moveend: CustomEvent<MoveEndEvent<CustomPieceType>>;
+    movefinished: CustomEvent<MoveFinishedEvent<CustomPieceType>>;
+    movecancel: CustomEvent<MoveCancelEvent<CustomPieceType>>;
   }
 }

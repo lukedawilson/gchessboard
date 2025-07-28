@@ -7,11 +7,11 @@ import {
 import { makeHTMLElement } from "../utils/dom.js";
 import { assertUnreachable } from "../utils/typing.js";
 
-export type BoardPieceConfig = {
+export type BoardPieceConfig<CustomPieceType extends string = never> = {
   /**
    * Piece type and color.
    */
-  piece: Piece;
+  piece: Piece<CustomPieceType>;
 
   /**
    * Whether the piece is to be considered a "secondary" piece on the square.
@@ -71,8 +71,8 @@ export type BoardPieceAnimation =
 /**
  * Visual representation of a chessboard piece.
  */
-export class BoardPiece {
-  readonly piece: Piece;
+export class BoardPiece<CustomPieceType extends string = never> {
+  readonly piece: Piece<CustomPieceType>;
   animationFinished?: Promise<void>;
 
   private readonly _element: HTMLSpanElement;
@@ -107,29 +107,45 @@ export class BoardPiece {
    */
   private static PIECE_DRAG_SCALE_PROP = "--p-piece-drag-scale";
 
-  private resolvePieceClass(color: Side, pieceType: PieceType) {
+  private resolvePieceClass(
+    color: Side,
+    pieceType: PieceType | CustomPieceType,
+    reverseCustomPieceTypeMap?: Record<string, string>
+  ): string {
+    reverseCustomPieceTypeMap ||= {} as Record<string, string>;
+
     const pieceClass = BoardPiece.PIECE_CLASS_MAP[color][pieceType];
     if (pieceClass) {
       return pieceClass;
     }
 
     const c = color === "white" ? "w" : "b";
-    const p = REVERSE_FEN_PIECE_TYPE_MAP[pieceType];
+    const p =
+      REVERSE_FEN_PIECE_TYPE_MAP[pieceType] ??
+      reverseCustomPieceTypeMap[pieceType];
     return `${c}${p}`;
   }
 
-  constructor(container: HTMLElement, config: BoardPieceConfig) {
+  constructor(
+    container: HTMLElement,
+    config: BoardPieceConfig<CustomPieceType>,
+    reverseCustomPieceTypeMap?: Record<string, string>
+  ) {
     this.piece = config.piece;
     this._parentElement = container;
     this._element = makeHTMLElement("span", {
       attributes: {
         role: "presentation",
         "aria-hidden": "true",
-        part: `piece-${this.resolvePieceClass(this.piece.color, this.piece.pieceType)}`,
+        part: `piece-${this.resolvePieceClass(this.piece.color, this.piece.pieceType, reverseCustomPieceTypeMap)}`,
       },
       classes: [
         "piece",
-        this.resolvePieceClass(this.piece.color, this.piece.pieceType),
+        this.resolvePieceClass(
+          this.piece.color,
+          this.piece.pieceType,
+          reverseCustomPieceTypeMap
+        ),
       ],
     });
 

@@ -9,22 +9,24 @@ import {
   Square,
   keyIsSquare,
   Piece,
+  PieceType,
 } from "../utils/chess.js";
 import { makeHTMLElement } from "../utils/dom.js";
 import { BoardState } from "./BoardState.js";
 import { assertUnreachable } from "../utils/typing.js";
 import { BoardSquare } from "./BoardSquare.js";
 
-export class Board {
+export class Board<CustomPieceType extends string = never> {
   private readonly _table: HTMLElement;
-  private readonly _boardSquares: BoardSquare[];
+  private readonly _boardSquares: BoardSquare<CustomPieceType>[];
   private readonly _dispatchEvent: <T>(e: CustomEvent<T>) => void;
   private readonly _shadowRef: ShadowRoot;
+  private readonly _pieceTypes?: (PieceType | CustomPieceType)[];
 
   private _orientation: Side;
   private _turn?: Side;
   private _interactive: boolean;
-  private _position: Position;
+  private _position: Position<CustomPieceType>;
   private _boardState: BoardState;
   private _tabbableSquare?: Square;
   private _defaultTabbableSquare: Square;
@@ -67,7 +69,9 @@ export class Board {
   constructor(
     initValues: { orientation: Side; animationDurationMs: number },
     dispatchEvent: <T>(e: CustomEvent<T>) => void,
-    shadowRef: ShadowRoot
+    shadowRef: ShadowRoot,
+    pieceTypes?: string[],
+    reverseCustomPieceTypeMap?: Record<string, string>
   ) {
     this._boardSquares = new Array(64);
     this._orientation = initValues.orientation;
@@ -77,6 +81,7 @@ export class Board {
     this._boardState = { id: "default" };
     this._dispatchEvent = dispatchEvent;
     this._shadowRef = shadowRef;
+    this._pieceTypes = pieceTypes;
 
     // Bottom left corner
     this._defaultTabbableSquare = getSquare(56, initValues.orientation);
@@ -96,7 +101,11 @@ export class Board {
       for (let j = 0; j < 8; j++) {
         const idx = 8 * i + j;
         const square = getSquare(idx, this.orientation);
-        this._boardSquares[idx] = new BoardSquare(row, square);
+        this._boardSquares[idx] = new BoardSquare(
+          row,
+          square,
+          reverseCustomPieceTypeMap
+        );
       }
       this._table.appendChild(row);
     }
@@ -211,15 +220,15 @@ export class Board {
   /**
    * Current `Position` object of board.
    */
-  get position(): Position {
+  get position(): Position<CustomPieceType> {
     return this._position;
   }
 
-  set position(value: Position) {
+  set position(value: Position<CustomPieceType>) {
     if (!positionsEqual(this._position, value)) {
       this._cancelMove(false);
 
-      const diff = calcPositionDiff(this._position, value);
+      const diff = calcPositionDiff(this._position, value, this._pieceTypes);
       this._position = { ...value };
 
       diff.moved.forEach(({ oldSquare }) => {
@@ -462,7 +471,7 @@ export class Board {
     });
   }
 
-  private _pieceMoveable(piece: Piece): boolean {
+  private _pieceMoveable(piece: Piece<CustomPieceType>): boolean {
     return !this.turn || piece.color === this.turn;
   }
 
@@ -555,7 +564,7 @@ export class Board {
   }
 
   private _handlePointerDown(
-    this: Board,
+    this: Board<CustomPieceType>,
     square: Square | undefined,
     e: PointerEvent
   ) {
@@ -616,7 +625,10 @@ export class Board {
     }
   }
 
-  private _handlePointerUp(this: Board, square: Square | undefined) {
+  private _handlePointerUp(
+    this: Board<CustomPieceType>,
+    square: Square | undefined
+  ) {
     let newFocusedSquare = square;
     switch (this._boardState.id) {
       case "touching-first-square":
@@ -698,7 +710,7 @@ export class Board {
   }
 
   private _handlePointerMove(
-    this: Board,
+    this: Board<CustomPieceType>,
     square: Square | undefined,
     e: PointerEvent
   ) {
@@ -780,7 +792,10 @@ export class Board {
     }
   }
 
-  private _handleClick(this: Board, square: Square | undefined) {
+  private _handleClick(
+    this: Board<CustomPieceType>,
+    square: Square | undefined
+  ) {
     if (this._preventClickHandling) {
       return;
     }
@@ -832,7 +847,10 @@ export class Board {
     }
   }
 
-  private _handleFocusIn(this: Board, square: Square | undefined) {
+  private _handleFocusIn(
+    this: Board<CustomPieceType>,
+    square: Square | undefined
+  ) {
     if (square) {
       if (
         // Some browsers (Safari) focus on board squares that are not tabbable
@@ -847,7 +865,7 @@ export class Board {
   }
 
   private _handleKeyDown(
-    this: Board,
+    this: Board<CustomPieceType>,
     square: Square | undefined,
     e: KeyboardEvent
   ) {
@@ -984,7 +1002,11 @@ export class Board {
   private _makeEventHandler<
     K extends PointerEvent | MouseEvent | KeyboardEvent | FocusEvent,
   >(
-    callback: (this: Board, square: Square | undefined, e: K) => void
+    callback: (
+      this: Board<CustomPieceType>,
+      square: Square | undefined,
+      e: K
+    ) => void
   ): (e: K) => void {
     const boundCallback = callback.bind(this);
     return (e: K) => {

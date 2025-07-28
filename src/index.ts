@@ -13,12 +13,11 @@ import {
   Square,
   getPosition,
   getFen,
-  addCustomPieceTypes,
 } from "./utils/chess.js";
 import { BoardArrow } from "./components/Arrows.js";
 import { CoordinatesPlacement } from "./components/Coordinates.js";
 
-export { GChessBoardElement, getPosition, getFen, addCustomPieceTypes };
+export { GChessBoardElement, getPosition, getFen };
 
 export type {
   BoardArrow,
